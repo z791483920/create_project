@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>CSS Highlight API 最小示例</title>
+  <style>
+    body {
+      font-family: system-ui;
+      padding: 40px;
+      font-size: 18px;
+      line-height: 1.8;
+    }
+
+    #editor {
+      border: 1px solid #ccc;
+      padding: 16px;
+      border-radius: 8px;
+      min-height: 100px;
+      outline: none;
+    }
+
+    /* 方案1：用 text-shadow 模拟发光边框 */
+    #editor::highlight(purple-highlight) {
+      color: #7B61FF;
+      background: rgba(123, 97, 255, 0.1);
+      text-shadow:
+        0 0 0 3px rgba(123, 97, 255, 0.3),
+        0 0 0 1px #7B61FF;
+    }
+
+    /* 方案2：多层 text-shadow 模拟粗边框 */
+    #editor::highlight(blue-highlight) {
+      color: #38A6FF;
+      text-shadow:
+        -1px -1px 0 rgba(56, 166, 255, 0.3),
+         1px -1px 0 rgba(56, 166, 255, 0.3),
+        -1px  1px 0 rgba(56, 166, 255, 0.3),
+         1px  1px 0 rgba(56, 166, 255, 0.3),
+         0    0  8px rgba(56, 166, 255, 0.5);
+    }
+
+    /* 方案3：-webkit-text-stroke 描边 */
+    #editor::highlight(border-like) {
+      color: #10B981;
+      -webkit-text-stroke: 0.5px #10B981;
+      text-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+    }
+
+    /* 方案4：组合大招 - 模拟 "胶囊" 效果 */
+    #editor::highlight(glow) {
+      color: #fff;
+      background: #F59E0B;
+      text-shadow:
+        0 0 2px #F59E0B,
+        0 0 4px #F59E0B,
+        0 0 8px #F59E0B;
+    }
+  </style>
+</head>
+<body>
+  <h2>CSS Highlight API 样式效果对比</h2>
+
+  <div id="editor" contenteditable="true">
+方案1 - 背景色：{{product_data}} 紫色背景
+
+方案2 - 下划线：[[faq_knowledge]] 蓝色下划线
+
+方案3 - 模拟边框：$$common_knowledge$$ 上下划线+背景
+
+方案4 - 发光效果：##glow_text## 文字阴影
+  </div>
+
+  <script>
+    // 定义需要高亮的变量（4种不同样式）
+    const variables = [
+      { value: '{{product_data}}', type: 'purple' },
+      { value: '[[faq_knowledge]]', type: 'blue' },
+      { value: '$$common_knowledge$$', type: 'border' },
+      { value: '##glow_text##', type: 'glow' },
+    ]
+
+    // 创建 4 种 Highlight 对象
+    const highlights = {
+      purple: new Highlight(),
+      blue: new Highlight(),
+      border: new Highlight(),
+      glow: new Highlight(),
+    }
+
+    CSS.highlights.set('purple-highlight', highlights.purple)
+    CSS.highlights.set('blue-highlight', highlights.blue)
+    CSS.highlights.set('border-like', highlights.border)
+    CSS.highlights.set('glow', highlights.glow)
+
+    // 高亮函数
+    function applyHighlight() {
+      const editor = document.getElementById('editor')
+      const text = editor.textContent || ''
+
+      // 清除所有旧的高亮
+      Object.values(highlights).forEach(h => h.clear())
+
+      // 遍历每个变量，找到匹配位置
+      variables.forEach(variable => {
+        const regex = new RegExp(escapeRegExp(variable.value), 'g')
+        let match
+
+        while ((match = regex.exec(text)) !== null) {
+          const start = match.index
+          const end = start + match[0].length
+          const range = createRangeFromTextOffset(editor, start, end)
+
+          if (range && highlights[variable.type]) {
+            highlights[variable.type].add(range)
+          }
+        }
+      })
+    }
+
+    // 辅助函数：转义正则特殊字符
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    // 辅助函数：根据文本偏移量创建 Range
+    function createRangeFromTextOffset(root, start, end) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      let currentOffset = 0
+      let startNode = null, startOffset = 0
+      let endNode = null, endOffset = 0
+
+      while (walker.nextNode()) {
+        const node = walker.currentNode
+        const nodeLength = node.textContent.length
+
+        // 找到起始位置
+        if (!startNode && currentOffset + nodeLength > start) {
+          startNode = node
+          startOffset = start - currentOffset
+        }
+
+        // 找到结束位置
+        if (!endNode && currentOffset + nodeLength >= end) {
+          endNode = node
+          endOffset = end - currentOffset
+          break
+        }
+
+        currentOffset += nodeLength
+      }
+
+      if (startNode && endNode) {
+        const range = new Range()
+        range.setStart(startNode, startOffset)
+        range.setEnd(endNode, endOffset)
+        return range
+      }
+
+      return null
+    }
+
+    // 初始化高亮
+    applyHighlight()
+
+    // 监听输入，实时更新高亮
+    document.getElementById('editor').addEventListener('input', applyHighlight)
+  </script>
+</body>
+</html>

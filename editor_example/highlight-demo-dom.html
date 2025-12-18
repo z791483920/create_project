@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>DOM 方式实现圆角高亮</title>
+  <style>
+    body {
+      font-family: system-ui;
+      padding: 40px;
+      font-size: 18px;
+      line-height: 2;
+    }
+
+    #editor {
+      border: 1px solid #ccc;
+      padding: 16px;
+      border-radius: 8px;
+      min-height: 100px;
+      outline: none;
+    }
+
+    /* 圆角高亮样式 */
+    .var-highlight {
+      color: #7B61FF;
+      background: rgba(123, 97, 255, 0.15);
+      border: 1px solid rgba(123, 97, 255, 0.3);
+      border-radius: 4px;
+      padding: 1px 4px;
+      margin: 0 2px;
+    }
+  </style>
+</head>
+<body>
+  <h2>DOM 方式 - 圆角高亮效果</h2>
+  <p style="color: #666; font-size: 14px;">⚠️ 注意：在编辑器内编辑可能会出现光标异常，这就是用 DOM 方式的缺点</p>
+
+  <div id="editor" contenteditable="true"></div>
+
+  <script>
+    const editor = document.getElementById('editor')
+
+    // 原始文本
+    const rawText = `回复策略
+- 基于 {{product_data}} & {{faq_knowledge}} & {{common_knowledge}} 回复
+- 仅当完全无法基于现有数据回答用户主要诉求时转人工。
+
+**禁止编造数据源中不存在的信息**
+- 基于 {{product_data}} & {{faq_knowledge}} 回复...`
+
+    // 把变量替换成带圆角的 span
+    function renderWithHighlight(text) {
+      return text.replace(
+        /\{\{(\w+)\}\}/g,
+        '<span class="var-highlight" contenteditable="false">{{$1}}</span>'
+      )
+    }
+
+    editor.innerHTML = renderWithHighlight(rawText)
+  </script>
+</body>
+</html>

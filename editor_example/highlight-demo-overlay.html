@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>伪元素覆盖层实现圆角高亮</title>
+  <style>
+    body {
+      font-family: system-ui;
+      padding: 40px;
+      font-size: 18px;
+      line-height: 2;
+    }
+
+    .editor-container {
+      position: relative;
+    }
+
+    #editor {
+      border: 1px solid #ccc;
+      padding: 16px;
+      border-radius: 8px;
+      min-height: 100px;
+      outline: none;
+    }
+
+    /* 覆盖层样式 - 圆角边框！ */
+    .highlight-overlay {
+      position: absolute;
+      pointer-events: auto;  /* 可以点击！ */
+      border: 1px solid #7B61FF;
+      border-radius: 4px;
+      background: rgba(123, 97, 255, 0.1);
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+
+    .highlight-overlay:hover {
+      background: rgba(123, 97, 255, 0.25);
+      border-color: #5B41DF;
+      transform: scale(1.02);
+    }
+
+    .highlight-overlay:active {
+      transform: scale(0.98);
+    }
+
+    /* 弹出菜单 */
+    .variable-popup {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 8px 0;
+      z-index: 100;
+      min-width: 150px;
+    }
+
+    .variable-popup-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .variable-popup-item:hover {
+      background: #f5f5f5;
+    }
+
+    .variable-popup-header {
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #666;
+      border-bottom: 1px solid #eee;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h2>覆盖层方案 - 可点击的圆角高亮！</h2>
+  <p style="color: #666; font-size: 14px;">点击变量可以弹出菜单</p>
+
+  <div class="editor-container">
+    <div id="overlays"></div>
+    <div id="editor" contenteditable="true">回复策略
+- 基于 {{product_data}} & {{faq_knowledge}} & {{common_knowledge}} 回复
+- 仅当完全无法基于现有数据回答用户主要诉求时转人工。
+
+**禁止编造数据源中不存在的信息**
+- 基于 {{product_data}} & {{faq_knowledge}} 回复...</div>
+  </div>
+
+  <script>
+    const editor = document.getElementById('editor')
+    const overlaysContainer = document.getElementById('overlays')
+    const variablePattern = /\{\{(\w+)\}\}/g
+
+    // 变量描述配置
+    const variableDescriptions = {
+      'product_data': {
+        title: '产品数据',
+        description: '包含产品名称、价格、规格等信息的数据源',
+        type: '数据源'
+      },
+      'faq_knowledge': {
+        title: 'FAQ 知识库',
+        description: '常见问题及答案的知识库，用于快速回答用户问题',
+        type: '知识库'
+      },
+      'common_knowledge': {
+        title: '通用知识',
+        description: '通用领域知识，包括行业术语、基础概念等',
+        type: '知识库'
+      }
+    }
+
+    let currentPopup = null
+
+    function showPopup(variableName, targetRect) {
+      // 关闭已有弹窗
+      hidePopup()
+
+      const info = variableDescriptions[variableName] || {
+        title: variableName,
+        description: '暂无描述',
+        type: '变量'
+      }
+
+      const popup = document.createElement('div')
+      popup.className = 'variable-popup'
+      popup.innerHTML = `
+        <div class="variable-popup-header">${info.type}</div>
+        <div class="variable-popup-item" style="font-weight: 600; color: #7B61FF;">
+          {{${variableName}}}
+        </div>
+        <div class="variable-popup-item" style="color: #333;">
+          ${info.title}
+        </div>
+        <div class="variable-popup-item" style="color: #666; font-size: 12px;">
+          ${info.description}
+        </div>
+        <div class="variable-popup-item" style="color: #7B61FF; border-top: 1px solid #eee; margin-top: 4px; padding-top: 8px;">
+          📋 复制变量
+        </div>
+        <div class="variable-popup-item" style="color: #e74c3c;">
+          🗑️ 删除变量
+        </div>
+      `
+
+      // 定位弹窗
+      const containerRect = document.querySelector('.editor-container').getBoundingClientRect()
+      popup.style.left = (targetRect.left - containerRect.left) + 'px'
+      popup.style.top = (targetRect.bottom - containerRect.top + 8) + 'px'
+
+      document.querySelector('.editor-container').appendChild(popup)
+      currentPopup = popup
+
+      // 点击弹窗外部关闭
+      setTimeout(() => {
+        document.addEventListener('click', handleOutsideClick)
+      }, 0)
+    }
+
+    function hidePopup() {
+      if (currentPopup) {
+        currentPopup.remove()
+        currentPopup = null
+        document.removeEventListener('click', handleOutsideClick)
+      }
+    }
+
+    function handleOutsideClick(e) {
+      if (currentPopup && !currentPopup.contains(e.target) && !e.target.classList.contains('highlight-overlay')) {
+        hidePopup()
+      }
+    }
+
+    function updateOverlays() {
+      // 清除旧的覆盖层
+      overlaysContainer.innerHTML = ''
+      hidePopup()
+
+      const text = editor.textContent || ''
+      const editorRect = editor.getBoundingClientRect()
+
+      // 找到所有变量的位置
+      let match
+      const regex = /\{\{(\w+)\}\}/g
+      while ((match = regex.exec(text)) !== null) {
+        const start = match.index
+        const end = start + match[0].length
+        const variableName = match[1]  // 提取变量名
+
+        // 创建 Range 获取位置
+        const range = createRangeFromTextOffset(editor, start, end)
+        if (!range) continue
+
+        // 获取 Range 的位置（可能跨多行，返回多个矩形）
+        const rects = range.getClientRects()
+
+        for (const rect of rects) {
+          // 创建覆盖层元素
+          const overlay = document.createElement('div')
+          overlay.className = 'highlight-overlay'
+          overlay.dataset.variable = variableName  // 存储变量名
+          overlay.style.left = (rect.left - editorRect.left + editor.offsetLeft) + 'px'
+          overlay.style.top = (rect.top - editorRect.top + editor.offsetTop) + 'px'
+          overlay.style.width = rect.width + 'px'
+          overlay.style.height = rect.height + 'px'
+
+          // 点击事件
+          overlay.addEventListener('click', (e) => {
+            e.stopPropagation()
+            showPopup(variableName, rect)
+          })
+
+          overlaysContainer.appendChild(overlay)
+        }
+      }
+    }
+
+    // 根据文本偏移量创建 Range
+    function createRangeFromTextOffset(root, start, end) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      let currentOffset = 0
+      let startNode = null, startOffset = 0
+      let endNode = null, endOffset = 0
+
+      while (walker.nextNode()) {
+        const node = walker.currentNode
+        const nodeLength = node.textContent.length
+
+        if (!startNode && currentOffset + nodeLength > start) {
+          startNode = node
+          startOffset = start - currentOffset
+        }
+
+        if (!endNode && currentOffset + nodeLength >= end) {
+          endNode = node
+          endOffset = end - currentOffset
+          break
+        }
+
+        currentOffset += nodeLength
+      }
+
+      if (startNode && endNode) {
+        const range = new Range()
+        range.setStart(startNode, startOffset)
+        range.setEnd(endNode, endOffset)
+        return range
+      }
+      return null
+    }
+
+    // 初始化
+    updateOverlays()
+
+    // 监听输入
+    editor.addEventListener('input', updateOverlays)
+
+    // 监听滚动（如果编辑器可滚动）
+    editor.addEventListener('scroll', updateOverlays)
+
+    // 监听窗口变化
+    window.addEventListener('resize', updateOverlays)
+  </script>
+</body>
+</html>
