@@ -26,22 +26,40 @@
     /* 覆盖层样式 - 圆角边框！ */
     .highlight-overlay {
       position: absolute;
-      pointer-events: auto;  /* 可以点击！ */
+      pointer-events: none;  /* 穿透，不影响编辑 */
       border: 1px solid #7B61FF;
       border-radius: 4px;
       background: rgba(123, 97, 255, 0.1);
-      transition: all 0.15s ease;
+    }
+
+    /* 小图标按钮 */
+    .highlight-icon {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 16px;
+      height: 16px;
+      background: #7B61FF;
+      border-radius: 50%;
+      pointer-events: auto;  /* 只有图标可点击 */
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #fff;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    .highlight-icon:hover {
+      transform: scale(1.2);
+      background: #5B41DF;
     }
 
     .highlight-overlay:hover {
-      background: rgba(123, 97, 255, 0.25);
+      background: rgba(123, 97, 255, 0.15);
       border-color: #5B41DF;
-      transform: scale(1.02);
-    }
-
-    .highlight-overlay:active {
-      transform: scale(0.98);
     }
 
     /* 弹出菜单 */
@@ -76,8 +94,8 @@
   </style>
 </head>
 <body>
-  <h2>覆盖层方案 - 可点击的圆角高亮！</h2>
-  <p style="color: #666; font-size: 14px;">点击变量可以弹出菜单</p>
+  <h2>覆盖层方案 - 小图标点击弹窗</h2>
+  <p style="color: #666; font-size: 14px;">点击变量上的小图标弹出菜单，点击文字可正常编辑</p>
 
   <div class="editor-container">
     <div id="overlays"></div>
@@ -201,18 +219,22 @@
           // 创建覆盖层元素
           const overlay = document.createElement('div')
           overlay.className = 'highlight-overlay'
-          overlay.dataset.variable = variableName  // 存储变量名
+          overlay.dataset.variable = variableName
           overlay.style.left = (rect.left - editorRect.left + editor.offsetLeft) + 'px'
           overlay.style.top = (rect.top - editorRect.top + editor.offsetTop) + 'px'
           overlay.style.width = rect.width + 'px'
           overlay.style.height = rect.height + 'px'
 
-          // 点击事件
-          overlay.addEventListener('click', (e) => {
+          // 创建小图标（只有图标可点击）
+          const icon = document.createElement('div')
+          icon.className = 'highlight-icon'
+          icon.innerHTML = 'i'
+          icon.addEventListener('click', (e) => {
             e.stopPropagation()
             showPopup(variableName, rect)
           })
 
+          overlay.appendChild(icon)
           overlaysContainer.appendChild(overlay)
         }
       }
